@@ -58,7 +58,7 @@ Rackspace.
 High availability clusters are usually desired for their ability to
 keep crucial services such as databases and file shares online and
 active in the event of unexpected server failures. When one member
-experiences a failure resources and services homed to that member at
+experiences a failure, resources and services homed to that member at
 the time of the failure automatically migrate to another member.
 
 Another facet of these clusters that rarely receives the attention it
@@ -70,7 +70,7 @@ who are tired of waking up at 3 a.m. to perform some simple maintenance
 that requires bringing a server offline. While Rackspace offers 24x7
 support, many of our customers work regular 9-5 hours. HA clusters give
 them the option to perform this type of operation during those regular
-business hours without negatively impacting their customers.
+business hours without negatively impacting their operations.
 
 ### High-Availability Cabinets
 
@@ -108,7 +108,7 @@ that the actual controller module may be something slightly different.
 
 The DRAC is an out-of-bound controller that allows administrators to
 power servers on, power them off, or connect to the console over the
-Internet, without logging into the server's operating system. Indeed,
+network without logging into the server's operating system. Indeed,
 an administrator can connect to the DRAC to perform operations even
 when the server is shutdown or in a crashed state. Since we cannot rely
 upon our ability to login to a failed cluster member via traditional
@@ -165,9 +165,7 @@ group to indicate which cluster member can access a logical volume at
 any given time. This actively prevents a filesystem from being mounted
 simultaneously by multiple machines and avoids filesystem corruption.
 
-### Configuration
-
-#### RHEL 5 and 6
+### RHEL 5 and 6
 
 In Red Hat versions 5 and 6, cluster configuration is largely handled
 by the /etc/cluster/cluster.conf file. This is an XML file which
@@ -176,7 +174,7 @@ clustered services. Let's take a look at an example. We won't go into
 exhausting detail here, but a look at how things are defined may be
 quite instructive.
 
-##### Cluster Nodes
+#### Cluster Nodes
 
 Every member of the cluster must have its own clusternode declaration.
 This simply lists the node members, names them, and names their fencing
@@ -199,7 +197,7 @@ devices.
       </clusternode> 
     </clusternodes> 
 
-##### Fencing Devices
+#### Fencing Devices
 
 Every fence device is declared here. They are named and those names are
 used as references for the node that would be fenced.
@@ -213,7 +211,7 @@ The agent type here is "fence_ipmilan". This is the agent that
 interfaces with DRAC devices and is used by Rackspace on all of our
 supported clusters.
 
-##### Resources
+#### Resources
 
 Resources must be defined individually. We will later group and order
 these in service declarations.
@@ -232,7 +230,7 @@ resources to start a MySQL database and create an NFS export. Finally,
 we've defined two different filesystem resources (fs) so that our
 cluster can mount its shared storage devices on the proper member.
 
-##### Services
+#### Services
 
 Once resources have been defined, we can group them into different
 services. These services ensure that every resource required to perform
@@ -262,7 +260,7 @@ reverse order.
       </ip> 
     </service> 
 
-##### Complete cluster.conf
+#### Complete cluster.conf
 
     <?xml version="1.0"?> 
     <cluster config_version="34" name="EXAMPLE"> 
@@ -314,6 +312,259 @@ reverse order.
       </rm> 
     </cluster>
 
+#### Cluster Status
+
+Viewing the current status of your cluster is easily accomplished with
+**clustat**.
+
+    # clustat
+    Cluster Status for mysql-clus
+    Member Status: Quorate
+    
+     Member Name            ID   Status
+     ------ ----            ---- ------
+     node01                 1 Online, Local, rgmanager
+     node02                 2 Online, rgmanager
+    
+     Service Name           Owner (Last)                 State
+     ------- ----           ----- ------                 -----
+     service:mysql-svc      node01                       started
+
+As you can see here, both node01 and node02 are online. There is only a
+single service defined (mysql-svc) and it is currently running on
+node01.
+
+#### Cluster Administration
+
+**clusvcadm** is used to restart services, move services, and
+enable/disable services. On all clusters Rackspace creates, the
+**/etc/motd** file is edited to include the following self-explainatory
+message:
+
+    ' ~= Will restart Oracle in place on the same server
+    'clusvcadm -r mysqlsvc -m <node name>' ~= Will relocate Oracle to that node
+    'clusvcadm -d mysqlsvc' ~= Will disable Oracle
+    'clusvcadm -e mysqlsvc' ~= Will enable Oracle
+
+
+### RHEL 7
+
+In version 7, Red Hat replaced its older clustering software with new
+alternatives. Some of the old daemons still exist, but configuration,
+monitoring, and management are handled by a new python utility called
+**pcs**.
+
+#### Cluster Nodes
+
+Every member of the cluster must have its own clusternode declaration.
+This simply lists the node members, names them, and names their fencing
+devices.
+
+    # pcs config show | head -n 5
+    Cluster Name: pcs2016-11-01
+    Corosync Nodes:
+     256188-linclus2a 256189-linclus2b 
+    Pacemaker Nodes:
+     256188-linclus2a 256189-linclus2b
+
+#### Fencing
+
+Declaring fencing methods operates a bit differently in RHEL 7.
+
+    # pcs config show | grep -A 6 ^Stonith
+    Stonith Devices: 
+     Resource: fence_node1 (class=stonith type=fence_ipmilan)
+      Attributes: power_wait=4 ipaddr=192.168.100.20 action=reboot login=root lanplus=1 pcmk_host_list=256188-linclus2a pcmk_host_check=static-list passwd=yMkxYVKPByE9zRN 
+      Operations: monitor interval=60s (fence_node1-monitor-interval-60s)
+     Resource: fence_node2 (class=stonith type=fence_ipmilan)
+      Attributes: power_wait=4 ipaddr=192.168.100.21 action=reboot login=root lanplus=1 pcmk_host_list=256189-linclus2b pcmk_host_check=static-list passwd=kIZC8UxS846Dujn delay=4 
+      Operations: monitor interval=60s (fence_node2-monitor-interval-60s)
+
+#### Services and Resources
+
+Unlike RHEL 5/6 where resources are defined individually, then added to
+a service, in RHEL 7 a resource group is defined and then resources are
+added to it. This creates a single resource group which can be stopped
+and started on demand.
+
+    # pcs resource show mysql-svc
+     Group: mysql-svc
+      Meta Attrs: migration-threshold=2 failure-timeout=60s 
+      Resource: mysql_ip (class=ocf provider=heartbeat type=IPaddr2)
+       Attributes: ip=192.168.100.12 
+       Operations: start interval=0s timeout=20s (mysql_ip-start-interval-0s)
+         stop interval=0s timeout=20s (mysql_ip-stop-interval-0s)
+         monitor interval=10s timeout=10s on-fail=restart (mysql_ip-monitor-interval-10s)
+      Resource: mysql_lvm (class=ocf provider=heartbeat type=LVM)
+       Attributes: volgrpname=vgmysql00 exclusive=true 
+       Operations: start interval=0s timeout=30 (mysql_lvm-start-interval-0s)
+         stop interval=0s timeout=30 (mysql_lvm-stop-interval-0s)
+         monitor interval=10s timeout=10s on-fail=restart (mysql_lvm-monitor-interval-10s)
+      Resource: mysql_fs (class=ocf provider=heartbeat type=Filesystem)
+       Attributes: device=/dev/vgmysql00/lvmysql00 directory=/san/mysql-fs fstype=ext4 options=nobarrier 
+       Operations: start interval=0s timeout=60 (mysql_fs-start-interval-0s)
+         stop interval=0s timeout=60 (mysql_fs-stop-interval-0s)
+         monitor interval=10s timeout=10s on-fail=restart (mysql_fs-monitor-interval-10s)
+      Resource: mysql_srv (class=ocf provider=heartbeat type=mysql)
+       Attributes: config=/etc/my.cnf enable_creation=0 user=mysql group=mysql datadir=/san/mysql-fs/mysql socket=/san/mysql-fs/mysql/mysql.sock additional_parameters=--bind-address=192.168.100.12 
+       Operations: promote interval=0s timeout=120 (mysql_srv-promote-interval-0s)
+         demote interval=0s timeout=120 (mysql_srv-demote-interval-0s)
+         monitor interval=10s timeout=10s on-fail=restart (mysql_srv-monitor-interval-10s)
+         start interval=0 timeout=600s (mysql_srv-start-interval-0)
+         stop interval=0 timeout=600s (mysql_srv-stop-interval-0)
+      Resource: mysql_snet_up (class=ocf provider=heartbeat type=IPaddr2)
+       Attributes: ip=10.241.177.133 
+       Operations: start interval=0s timeout=20s (mysql_snet_up-start-interval-0s)
+         stop interval=0s timeout=20s (mysql_snet_up-stop-interval-0s)
+         monitor interval=10s timeout=10s on-fail=ignore (mysql_snet_up-monitor-interval-10s)
+
+#### Complete configuration
+
+    # pcs config show
+    Cluster Name: pcs2016-11-01
+    Corosync Nodes:
+     256188-linclus2a 256189-linclus2b 
+    Pacemaker Nodes:
+     256188-linclus2a 256189-linclus2b 
+    
+    Resources: 
+     Clone: dlm-clone
+      Meta Attrs: notify=true interleave=true ordered=false 
+      Resource: dlm (class=ocf provider=pacemaker type=controld)
+       Operations: start interval=0s timeout=90 (dlm-start-interval-0s)
+         stop interval=0s timeout=100 (dlm-stop-interval-0s)
+         monitor interval=60s timeout=60s on-fail=fence (dlm-monitor-interval-60s)
+     Clone: clvmd-clone
+      Meta Attrs: notify=true interleave=true ordered=false 
+      Resource: clvmd (class=ocf provider=heartbeat type=clvm)
+       Attributes: activate_vgs=false 
+       Operations: start interval=0s timeout=90 (clvmd-start-interval-0s)
+         stop interval=0s timeout=90 (clvmd-stop-interval-0s)
+         monitor interval=60s timeout=60s on-fail=fence (clvmd-monitor-interval-60s)
+     Group: mysql-svc
+      Meta Attrs: migration-threshold=2 failure-timeout=60s 
+      Resource: mysql_ip (class=ocf provider=heartbeat type=IPaddr2)
+       Attributes: ip=192.168.100.12 
+       Operations: start interval=0s timeout=20s (mysql_ip-start-interval-0s)
+         stop interval=0s timeout=20s (mysql_ip-stop-interval-0s)
+         monitor interval=10s timeout=10s on-fail=restart (mysql_ip-monitor-interval-10s)
+      Resource: mysql_lvm (class=ocf provider=heartbeat type=LVM)
+       Attributes: volgrpname=vgmysql00 exclusive=true 
+       Operations: start interval=0s timeout=30 (mysql_lvm-start-interval-0s)
+         stop interval=0s timeout=30 (mysql_lvm-stop-interval-0s)
+         monitor interval=10s timeout=10s on-fail=restart (mysql_lvm-monitor-interval-10s)
+      Resource: mysql_fs (class=ocf provider=heartbeat type=Filesystem)
+       Attributes: device=/dev/vgmysql00/lvmysql00 directory=/san/mysql-fs fstype=ext4 options=nobarrier 
+       Operations: start interval=0s timeout=60 (mysql_fs-start-interval-0s)
+         stop interval=0s timeout=60 (mysql_fs-stop-interval-0s)
+         monitor interval=10s timeout=10s on-fail=restart (mysql_fs-monitor-interval-10s)
+      Resource: mysql_srv (class=ocf provider=heartbeat type=mysql)
+       Attributes: config=/etc/my.cnf enable_creation=0 user=mysql group=mysql datadir=/san/mysql-fs/mysql socket=/san/mysql-fs/mysql/mysql.sock additional_parameters=--bind-address=192.168.100.12 
+       Operations: promote interval=0s timeout=120 (mysql_srv-promote-interval-0s)
+         demote interval=0s timeout=120 (mysql_srv-demote-interval-0s)
+         monitor interval=10s timeout=10s on-fail=restart (mysql_srv-monitor-interval-10s)
+         start interval=0 timeout=600s (mysql_srv-start-interval-0)
+         stop interval=0 timeout=600s (mysql_srv-stop-interval-0)
+      Resource: mysql_snet_up (class=ocf provider=heartbeat type=IPaddr2)
+       Attributes: ip=10.241.177.133 
+       Operations: start interval=0s timeout=20s (mysql_snet_up-start-interval-0s)
+         stop interval=0s timeout=20s (mysql_snet_up-stop-interval-0s)
+         monitor interval=10s timeout=10s on-fail=ignore (mysql_snet_up-monitor-interval-10s)
+     Clone: Pacewatcher-clone
+      Meta Attrs: interleave=true ordered=false 
+      Resource: Pacewatcher (class=ocf provider=pacemaker type=ClusterMon)
+       Attributes: user=root update=10000 extra_options="-E /usr/local/sbin/pacewatcher --watch-fencing" pidfile=/var/run/pacewatcher.pid 
+       Operations: start interval=0s timeout=20 (Pacewatcher-start-interval-0s)
+         stop interval=0s timeout=20 (Pacewatcher-stop-interval-0s)
+         monitor interval=10 timeout=20 (Pacewatcher-monitor-interval-10)
+    
+    Stonith Devices: 
+     Resource: fence_node1 (class=stonith type=fence_ipmilan)
+      Attributes: power_wait=4 ipaddr=192.168.100.20 action=reboot login=root lanplus=1 pcmk_host_list=256188-linclus2a pcmk_host_check=static-list passwd=yMkxYVKPByE9zRN 
+      Operations: monitor interval=60s (fence_node1-monitor-interval-60s)
+     Resource: fence_node2 (class=stonith type=fence_ipmilan)
+      Attributes: power_wait=4 ipaddr=192.168.100.21 action=reboot login=root lanplus=1 pcmk_host_list=256189-linclus2b pcmk_host_check=static-list passwd=kIZC8UxS846Dujn delay=4 
+      Operations: monitor interval=60s (fence_node2-monitor-interval-60s)
+    Fencing Levels: 
+    
+    Location Constraints:
+      Resource: fence_node1
+        Disabled on: 256188-linclus2a (score:-INFINITY) (id:location-fence_node1-256188-linclus2a--INFINITY)
+      Resource: fence_node2
+        Disabled on: 256189-linclus2b (score:-INFINITY) (id:location-fence_node2-256189-linclus2b--INFINITY)
+      Resource: mysql-svc
+        Enabled on: 256189-linclus2b (score:INFINITY) (role: Started) (id:cli-prefer-mysql-svc)
+    Ordering Constraints:
+      start dlm-clone then start clvmd-clone (kind:Mandatory) (id:order-dlm-clone-clvmd-clone-mandatory)
+      start clvmd-clone then start mysql-svc (kind:Mandatory) (id:order-clvmd-clone-mysql-svc-mandatory)
+    Colocation Constraints:
+    
+    Resources Defaults:
+     No defaults set
+    Operations Defaults:
+     No defaults set
+    
+    Cluster Properties:
+     cluster-infrastructure: corosync
+     cluster-name: pcs2016-11-01
+     dc-version: 1.1.13-10.el7_2.4-44eb2dd
+     default-resource-stickiness: 100
+     have-watchdog: false
+
+#### Cluster Status
+
+Viewing the current status for the cluster is likewise accomplished with
+pcs.
+
+    # pcs status 
+    Cluster name: pcs2016-11-01
+    Last updated: Mon Jan 23 15:08:19 2017		Last change: Thu Jan 19 17:14:50 2017 by root via crm_resource on 256189-linclus2b
+    Stack: corosync
+    Current DC: 256188-linclus2a (version 1.1.13-10.el7_2.4-44eb2dd) - partition with quorum
+    2 nodes and 13 resources configured
+    
+    Online: [ 256188-linclus2a 256189-linclus2b ]
+    
+    Full list of resources:
+    
+     fence_node1	(stonith:fence_ipmilan):	Started 256189-linclus2b
+     fence_node2	(stonith:fence_ipmilan):	Started 256188-linclus2a
+     Clone Set: dlm-clone [dlm]
+         Started: [ 256188-linclus2a 256189-linclus2b ]
+     Clone Set: clvmd-clone [clvmd]
+         Started: [ 256188-linclus2a 256189-linclus2b ]
+     Resource Group: mysql-svc
+         mysql_ip	(ocf::heartbeat:IPaddr2):	Started 256189-linclus2b
+         mysql_lvm	(ocf::heartbeat:LVM):	Started 256189-linclus2b
+         mysql_fs	(ocf::heartbeat:Filesystem):	Started 256189-linclus2b
+         mysql_srv	(ocf::heartbeat:mysql):	Started 256189-linclus2b
+         mysql_snet_up	(ocf::heartbeat:IPaddr2):	Started 256189-linclus2b
+     Clone Set: Pacewatcher-clone [Pacewatcher]
+         Started: [ 256188-linclus2a 256189-linclus2b ]
+    
+    PCSD Status:
+      256188-linclus2a: Online
+      256189-linclus2b: Online
+    
+    Daemon Status:
+      corosync: active/enabled
+      pacemaker: active/enabled
+      pcsd: active/enabled
+
+#### Cluster Administration
+
+Similarly, pcs is used to administer the cluster. On all clusters
+Rackspace creates, the /etc/motd file is edited to include the following
+self-explainatory message:
+
+    'pcs cluster standby <node>'      ~= Place <node> into Standby
+    'pcs cluster unstandby <node>'    ~= Take <node> out of Standby
+    
+    'pcs resource disable my-svc'     ~= Disable resource group
+    'pcs resource enable mys-svc'     ~= Enable resource group
+    'pcs resource restart my-svc'     ~= Restart resource group
+    'pcs resource move my-svc <node>' ~= Move my-svc to <node> + create a constraint
+    'pcs resource clear my-svc'       ~= Clear resource constraints after a move
 
 
 
