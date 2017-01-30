@@ -75,7 +75,7 @@ business hours without negatively impacting their operations.
 ### High-Availability Cabinets
 
 In addition to making the servers themselves redundant, most of our
-customers chose to place their clusters into our high-availability
+customers choose to place their clusters into our high-availability
 cabinets. Doing so eliminates many other single points of failure by
 adding the following features:
 
@@ -100,13 +100,13 @@ Fencing allows a working server to terminate a non-functional server,
 forcing it to release its resources in the process. Fencing is
 sometimes refered to as STONITH (Shoot The Other Node In The Head).
 
-At Rackspace, fencing is handled by the servers' built-in out-of-bound
+At Rackspace, fencing is handled by the servers' built-in out-of-band
 controller. On Dell devices, this is the DRAC module; HP servers use
 their iLO module. As Dells are still the most prevalent servers at
 Rackspace, we will refer to these devices as DRACs. Just keep in mind
 that the actual controller module may be something slightly different.
 
-The DRAC is an out-of-bound controller that allows administrators to
+The DRAC is an out-of-band controller that allows administrators to
 power servers on, power them off, or connect to the console over the
 network without logging into the server's operating system. Indeed,
 an administrator can connect to the DRAC to perform operations even
@@ -159,7 +159,7 @@ them.
 
 Rackspace uses LVM (Logical Volume Management) capabilities to share
 storage between multiple members. Linux's LVM implementation includes a
-cluster daemon (clvmd) which is responsible for locking filesystem to a
+cluster daemon (clvmd) which is responsible for locking filesystems to a
 single member. When clvmd is active, it writes metadata to the volume
 group to indicate which cluster member can access a logical volume at
 any given time. This actively prevents a filesystem from being mounted
@@ -171,7 +171,7 @@ In Red Hat versions 5 and 6, cluster configuration is largely handled
 by the /etc/cluster/cluster.conf file. This is an XML file which
 defines the members, fencing devices, clustered resources, and
 clustered services. Let's take a look at an example. We won't go into
-exhausting detail here, but a look at how things are defined may be
+exhaustive detail here, but a look at how things are defined may be
 quite instructive.
 
 #### Cluster Nodes
@@ -223,20 +223,18 @@ these in service declarations.
       <ip address="10.241.36.250" monitor_link="0"/> 
     </resources> 
 
-Here we have defined two floating IP addresses in the public subnet
-(192.160.100.x) and two floating IP addresses in our servicenet subnet
-(10.241.36.x) for backup operations. Additionally, we've created
-resources to start a MySQL database and create an NFS export. Finally,
-we've defined two different filesystem resources (fs) so that our
-cluster can mount its shared storage devices on the proper member.
+Here we have defined a floating IP address in the public subnet
+(192.160.100.250) and a floating IP address in our servicenet subnet
+(10.241.36.250) for backup operations. Additionally, we've created a
+filesystem resource (fs) so our cluster can mount its shared storage
+device. Finally, we have a script resource to start the MySQL daemon.
 
 #### Services
 
 Once resources have been defined, we can group them into different
 services. These services ensure that every resource required to perform
 a task (such as running MySQL) is grouped together. It also handles
-starting and stopping those resources in the correct order to avoid
-filesystem corruption.
+starting and stopping those resources in the correct order.
 
 Below, we've defined a database service entitled
 "MySQL" which includes 4 different resources. By looking at the
@@ -323,28 +321,28 @@ Viewing the current status of your cluster is easily accomplished with
     
      Member Name            ID   Status
      ------ ----            ---- ------
-     node01                 1 Online, Local, rgmanager
-     node02                 2 Online, rgmanager
+     c80216-db1             1 Online, Local, rgmanager
+     c80217-db2             2 Online, rgmanager
     
      Service Name           Owner (Last)                 State
      ------- ----           ----- ------                 -----
-     service:mysql-svc      node01                       started
+     service:mysql-svc      c80216-db1                   started
 
-As you can see here, both node01 and node02 are online. There is only a
-single service defined (mysql-svc) and it is currently running on
-node01.
+As you can see here, both c80216-db1 and c80217-db2 are online. There is
+only a single service defined (mysql-svc) and it is currently running on
+c80216-db1.
 
 #### Cluster Administration
 
 **clusvcadm** is used to restart services, move services, and
 enable/disable services. On all clusters Rackspace creates, the
-**/etc/motd** file is edited to include the following self-explainatory
-message:
+**/etc/motd** file is edited to include a self-explainatory message
+that will assist you in performing several common tasks:
 
-    ' ~= Will restart Oracle in place on the same server
-    'clusvcadm -r mysqlsvc -m <node name>' ~= Will relocate Oracle to that node
-    'clusvcadm -d mysqlsvc' ~= Will disable Oracle
-    'clusvcadm -e mysqlsvc' ~= Will enable Oracle
+    'clusvcadm -R mysqlsvc' ~= Will restart MySQL in place on the same server
+    'clusvcadm -r mysqlsvc -m <node name>' ~= Will relocate MySQL to that node
+    'clusvcadm -d mysqlsvc' ~= Will disable MySQL
+    'clusvcadm -e mysqlsvc' ~= Will enable MySQL
 
 
 ### RHEL 7
@@ -418,7 +416,30 @@ and started on demand.
          stop interval=0s timeout=20s (mysql_snet_up-stop-interval-0s)
          monitor interval=10s timeout=10s on-fail=ignore (mysql_snet_up-monitor-interval-10s)
 
-#### Complete configuration
+#### Location Constraints
+
+Often it's important that services don't run on a particular member of
+the cluster, or that two services run together on the same member (or
+alternatively *never* run on the same member). This is accomplished by
+configuring resource constraints. In particular, you will always want
+to ensure that the fencing resource **never** runs on the member it
+fences. If this happens, then it is impossible to properly fence that
+device in many failure scenarios.
+
+    # pcs config show | grep -A 10 ^Location
+    Location Constraints:
+      Resource: fence_node1
+        Disabled on: 256188-linclus2a (score:-INFINITY) (id:location-fence_node1-256188-linclus2a--INFINITY)
+      Resource: fence_node2
+        Disabled on: 256189-linclus2b (score:-INFINITY) (id:location-fence_node2-256189-linclus2b--INFINITY)
+      Resource: mysql-svc
+        Enabled on: 256189-linclus2b (score:INFINITY) (role: Started) (id:cli-prefer-mysql-svc)
+    Ordering Constraints:
+      start dlm-clone then start clvmd-clone (kind:Mandatory) (id:order-dlm-clone-clvmd-clone-mandatory)
+      start clvmd-clone then start mysql-svc (kind:Mandatory) (id:order-clvmd-clone-mysql-svc-mandatory)
+    Colocation Constraints:
+
+#### Complete Configuration
 
     # pcs config show
     Cluster Name: pcs2016-11-01
@@ -554,15 +575,15 @@ pcs.
 #### Cluster Administration
 
 Similarly, pcs is used to administer the cluster. On all clusters
-Rackspace creates, the /etc/motd file is edited to include the following
-self-explainatory message:
+Rackspace creates, the /etc/motd file is edited to include a
+self-explainatory message like:
 
     'pcs cluster standby <node>'      ~= Place <node> into Standby
     'pcs cluster unstandby <node>'    ~= Take <node> out of Standby
     
-    'pcs resource disable my-svc'     ~= Disable resource group
-    'pcs resource enable mys-svc'     ~= Enable resource group
-    'pcs resource restart my-svc'     ~= Restart resource group
+    'pcs resource disable my-svc'     ~= Disable resource group my-svc
+    'pcs resource enable my-svc'     ~= Enable resource group my-svc
+    'pcs resource restart my-svc'     ~= Restart resource group my-svc
     'pcs resource move my-svc <node>' ~= Move my-svc to <node> + create a constraint
     'pcs resource clear my-svc'       ~= Clear resource constraints after a move
 
