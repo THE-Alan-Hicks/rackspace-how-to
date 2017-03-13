@@ -5,7 +5,7 @@ title: Dedicated Hosting FAQ
 type: product
 created_date: '2017-01-17'
 created_by: Alan Hicks
-last_modified_date: '2017-01-23'
+last_modified_date: '2017-03-13'
 last_modified_by: Alan Hicks
 product: Dedicated Hosting
 product_url: dedicated-hosting
@@ -51,7 +51,7 @@ Rackspace.
     - Rackspace supports shared storage through our SAN and NAS offerings.
     - iSCSI and NFS storage solutions are also supported, but not recommended.
     - Rackspace highly recommends dedicated SAN or shared SAN for their performance benefits and robust nature.
-    - GFS2 is **not** supported.
+    - GFS2, glusterfs, and similar filesystems are **not** supported.
 
 ### Features
 
@@ -115,7 +115,7 @@ upon our ability to login to a failed cluster member via traditional
 means, the DRAC is an ideal platform for fencing.
 
 Should one of the cluster members crash or otherwise misbehave, its
-peer will connect to the crashed member's DRAC and power cycle the
+peer will connect to the failed member's DRAC and power cycle the
 system. This is a robust and fast way to force a broken member to
 release all of its resources immediately. The effects are not unlike
 pressing the "reset" button on a workstation. All activity is
