@@ -10,6 +10,8 @@
 	- [Writing guidelines](#writing-guidelines)
 	- [Support and feedback](#support-and-feedback)
 
+**Important:** You need to log into public GitHub, not the enterprise GitHub, to contribute. If you have questions, contact us at [how-to@rackspace.com](mailto:how-to@rackspace.com).
+
 ## Contributing to the Rackspace How-To content repository
 
 This file describes the general process for maintaining source code for content published at [https://support.rackspace.com/how-to/](https://support.rackspace.com/how-to/).
@@ -36,7 +38,7 @@ A personal copy of the How-To repository is created in your GitHub account. You 
 
 Because your forked copy of the repository is not live, you need to periodically update it with changes from the live repository. A status message above the latest commit activity informs you whether your forked repository is current with the master How-To repository. If the status says `This branch is X commits behind rackerlabs:master`, update your repo by clicking the **Pull request** button to the right of the message.
 
-**Note:** If you get a message that the rackerlabs:master branch is up-to-date with commits from your master branch, click the "switching the base" link. 
+**Note:** If you get a message that the rackerlabs:master branch is up-to-date with commits from your master branch, click the "switching the base" link.
 
 **WARNING:** To avoid any merge conflicts or difficulties when making a pull request, always check that your copy of the fork is up to date with the master repository.
 
@@ -52,7 +54,7 @@ Follow these steps to create a new article within a product folder of the **rack
 
 1. Go to the [Rackspace How-To content folder](https://github.com/rackerlabs/rackspace-how-to/tree/master/content) and click the product for which you want to create an article.
 
-2. Click **New file**.
+2. Click **Create new file**.
 
 3. Enter a name for your article in the text box at the end of the **rackspace-how-to/content/*productName*/** string. The name should be in the format **your-article-name.md** and should reflect the title of the article.
 
@@ -60,7 +62,7 @@ Follow these steps to create a new article within a product folder of the **rack
 
            ---
            permalink: title-of-article/
-           audit_date: 
+           audit_date:
            title: Title of article
            type: article
            created_date: 'YYYY-MM-DD'
@@ -74,20 +76,18 @@ Follow these steps to create a new article within a product folder of the **rack
 
 6. When you have finished writing your article, review it in the **Preview** tab.
 
-7. Click **Propose new change**.
+7. At the bottom of the page, click **Propose new file**.
 
-8. Create a pull request (PR). On the "Comparing changes" page, check the following settings:
+8. Create a pull request (PR). On the "Open a pull request" page, check the following settings:
 
     - `base fork: rackerlabs/rackspace-how-to`
     - `base: master`
     - `head fork: {your-username}/rackspac...`
     - `compare: {your-branch}`
-    
-   If the settings are not correct, use the drop down menus to select the correct settings. 
 
-   If the settings are correct, click **Create pull request**. 
+   If the settings are not correct, use the drop down menus to select the correct settings. The fork menus may not be present.
 
-10. Describe the reasons for your change in the comment box, than select **Create pull request**.
+9. Describe the reasons for your change in the comment box, and then select **Create pull request**.
 
 **Note:** If your article includes images, send an email to <how-to@rackspace.com> with the image files. Note where the images belong in the article by using comments: `<!--this is a comment-->`.
 
@@ -99,7 +99,7 @@ Follow these steps to edit an existing article within a product folder of the **
 
 1. Go to the [Rackspace How-To content folder](https://github.com/rackerlabs/rackspace-how-to/tree/master/content) and click the product for which you want to edit an article.
 
-2. Find the article you want to edit and click to open the file. 
+2. Find the article you want to edit and click to open the file.
 
 3. At the top of the article, click the pencil (Edit this file) icon.
 
@@ -107,19 +107,19 @@ Follow these steps to edit an existing article within a product folder of the **
 
     **Note:** If you are using a desktop client or the command line, and you are forking or cloning the repository, be sure to make your changes in a new branch. Doing so ensures that you are producing a pull request (PR) rather than committing changes directly to the master.
 
-5. When you have finished editing the article, click **Propose file change**.
+5. When you have finished editing the article, review it in the **Preview** tab.
 
-6. On the "Comparing changes" page, check the following settings:
+6. At the bottom of the page, click **Propose file change**.
+
+7. On the "Open a pull request" page, check the following settings:
 
     - `base fork: rackerlabs/rackspace-how-to`
     - `base: master`
     - `head fork: {your-username}/rackspac...`
     - `compare: {your-branch}`
 
-   If the settings are not correct, use the drop down menus to select the correct settings. 
+   If the settings are not correct, use the drop down menus to select the correct settings. The fork menus may not be present.
 
-   If the settings are correct, click **Create pull request**.
-   
 7. Describe the changes that you made in a PR message.
 
    Use the following guidelines to create the PR message:
@@ -147,7 +147,7 @@ You might be asked by a member of the editorial team to update your PR. Follow t
 
 6. Provide a brief description of the change.
 
-7. Click  the **Commit directly to the `your-branch-name` branch** option, and then click **Commit changes**.
+7. Click the **Commit directly to the `your-branch-name` branch** option, and then click **Commit changes**.
 
 The How-To team will comment on the PR if any more changes need to be made.
 
